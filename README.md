@@ -1,8 +1,8 @@
 # About
 
-Takes the backup from the Daylio journal in the `.daylio` format (described below) 
-and converts to Markdown files. This doesn't work with the CSV format, since that doesn't support
-exporting the images you might add to your notes.
+Takes the backup from the [Daylio](https://daylio.net/) journal in the `.daylio` format (described below)
+and converts to Markdown files. This script doesn't support the CSV format as an intentional choice,
+since that format doesn't support exporting the images/audio added to your notes.
 
 Intended to be used once or multiple times. For example for regularly syncing your Daylio journal
 into your Obsidian (or otherwise) Markdown vault.
@@ -19,22 +19,24 @@ I have not tested with an iOS Daylio export. I don't know what might be differen
 I assume the "AndroidMetadata" block isn't present in the iOS export and is replaced by something
 iOS relevant.
 
-# TODO
+# Enhancements / TODOs
 
-Things I'm interested in adding based on my needs (but PRs for other functionality are welcome):
+Things that  I'm either interested in doing for my own needs or I could see other people benefitting from:
 
-- Support merging notes into an existing note (e.g. into a heading in your daily Obsidian note). 
-  For now this script always overwrites the existing file if one does exist
-  (meaning you should export to a folder specific for this export and not used for anything else).
-- Support condensing multiple notes into a single markdown file. For example, a single file per day
-  or month or even year.
-- Support for exporting all ratings into a single file. Or maybe just the ratings but not the notes.
-  This might be ideal for incorporating with [Obsidian Dataview](https://github.com/blacksmithgu/obsidian-dataview).
-- Support for custom filename templates.
+- Insert Daylio notes into existing notes (e.g. add a Daylio heading in your daily Obsidian note)
+  rather than overwriting existing notes.
+- Condense multiple notes from the same day/week/month into a single markdown file.
+- Export all moods into a single chronological file. To better support individual files for text content
+  and media, but still exporting all of the moods without creating thousands of files.
+  - This might be ideal for incorporating with
+    [Obsidian Dataview](https://github.com/blacksmithgu/obsidian-dataview).
+- Custom filename template (possibly in-line with combining multiple entries into one file).
+- CVS Daylio export support - would be easy to add, but I'm not interested due to lack of image support.
+- Support for other data-points in the `.daylio` backup.
 
 # Installation
 
-I recommend pipx:
+I recommend [pipx](https://github.com/pypa/pipx):
 
 ```
 pipx install git+https://github.com/mbafford/daylio-markdown-export.git
@@ -55,10 +57,14 @@ There's an example that outputs most of the data available in template.md.
 
 Information about how to write Jinja2 templates is outside the scope of this README.
 
-# Related
+# Related Projects
 
 - [Obsidian Daylio Parser](https://github.com/DeutscheGabanna/Obsidian-Daylio-Parser)
-  reads the CSV export format, so doesn't include images
+  - Reads the CSV export format, so doesn't include images.
+- [Daylio to Obsidian Daily Notes](https://github.com/fsaresh/Dayio-to-Obsidian-Daily-Notes)
+  - Another CSV to Markdown exporter.
+- [Daylio Web](https://github.com/jaxparrow07/daylio-web)
+  - Loads the `.daylio` backup file and allows you to browse the journal, with a nice UI and charts.  
 
 # Data Format
 
@@ -105,7 +111,7 @@ zip archive, you fill find a structure something like this:
 ```json
 {
   "version": 15,
-  pin: 12345,
+  "pin": 12345,
   "achievements": [],
   "goalEntries": [],
   "goalSuccessWeeks": [],
