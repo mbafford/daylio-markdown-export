@@ -7,7 +7,7 @@ import sys
 import zipfile
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Generator, List, Optional
+from typing import Dict, Generator, List, Optional, Set
 
 import click
 import html2text
@@ -178,10 +178,22 @@ class DaylioJournal():
                 file=None
             )
 
+        # in my journal two entries have the exact same timestamp - probably from
+        # manually setting a time for a past event - keep track of those and increment
+        # timestamps by a millisecond to avoid duplicate keys in the dict
+        seen_entry_timestamps: Set[int] = set()
+
         for day_entry in data['dayEntries']:
+            epochtime = day_entry['datetime']
+            while epochtime in seen_entry_timestamps:
+                # print(f"Incrementing timestamp on entry due to duplicates - from {epochtime} to {epochtime + 1}")
+                epochtime += 1
+
+            seen_entry_timestamps.add(epochtime)
+
             # Convert milliseconds to seconds for the timestamp
             timestamp = datetime.datetime.fromtimestamp(
-                day_entry['datetime'] / 1000,
+                epochtime / 1000,
                 datetime.timezone(datetime.timedelta(seconds=day_entry['timeZoneOffset'] / 1000))
             )
 
