@@ -9,6 +9,9 @@ into your Obsidian (or otherwise) Markdown vault.
 
 Will export the notes into defined folder path, and images into another defined folder path.
 
+Does not overwrite an existing file if no changes to avoid large refresh cycles with Obsidian and
+to avoid syncing effectively unchanged notes due to updated modify times.
+
 # Status
 
 Fully functioning for my use-case.

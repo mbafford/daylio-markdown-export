@@ -12,6 +12,7 @@ from typing import Dict, Generator, List, Optional, Set
 import click
 import html2text
 import magic
+import tqdm
 from jinja2 import Environment, FileSystemLoader, Template
 
 # the version of my export as of 2023-11-27 Android app version 1.54.4
@@ -235,6 +236,21 @@ class DaylioJournalBackup():
         return DaylioJournal(self.load_asset('backup.daylio'))
 
 
+def write_file_if_unchanged(path: str, bytes: bytes) -> bool:
+    """
+    Write a file to disk, but only if the contents are different from the existing file.
+    """
+    if os.path.exists(path):
+        with open(path, 'rb') as f:
+            if f.read() == bytes:
+                return False
+
+    with open(path, 'wb') as f:
+        f.write(bytes)
+
+    return True
+
+
 @click.command()
 @click.option('--backup',
               type=click.Path(exists=True, dir_okay=False, file_okay=True, readable=True),
@@ -258,7 +274,10 @@ class DaylioJournalBackup():
 @click.option('--skip-empty',
               is_flag=True,
               help="Skip entries with no note and no assets (photos, audio).)")
-def main(backup, markdown, images, template, overwrite, ignore_version, skip_empty):
+@click.option('--verbose',
+              is_flag=True,
+              help="Print verbose output.")
+def main(backup, markdown, images, template, overwrite, ignore_version, skip_empty, verbose):
     """Converts Daylio export files to Markdown format."""
 
     with DaylioJournalBackup(backup) as daylio:
@@ -287,40 +306,75 @@ def main(backup, markdown, images, template, overwrite, ignore_version, skip_emp
         )
         template = jinja.get_template(os.path.basename(template))
 
-        for daily_entry in journal.day_entries:
-            filename = f"{daily_entry.timestamp.strftime('%Y-%m-%d')} - Daylio - {daily_entry.timestamp.timestamp()}.md"
-            path = os.path.join(markdown, filename)
-            if os.path.exists(path) and not overwrite:
-                click.echo(f"Skipping {filename} as it already exists.")
-                continue
+        skipped_existing_asset = 0
+        skipped_existing_note = 0
+        skipped_empty = 0
+        exported_note = 0
+        exported_asset = 0
 
-            if skip_empty:
-                if not daily_entry.note_html and not daily_entry.note_title and not daily_entry.assets:
-                    click.echo(f"Skipping {filename} as it has no note and no assets.")
+        with tqdm.tqdm(journal.day_entries, desc='Exporting Daylio entries', disable=not sys.stdout.isatty()) as t:
+            for daily_entry in t:
+                t.set_postfix_str(f"skipped: {skipped_empty} empty / "
+                                  f"{skipped_existing_note} existing notes / "
+                                  f"{skipped_existing_asset} existing assets")
+
+                filename = f"{daily_entry.timestamp.strftime('%Y-%m-%d')} - Daylio - {daily_entry.timestamp.timestamp()}.md"
+                path = os.path.join(markdown, filename)
+                if os.path.exists(path) and not overwrite:
+                    skipped_existing_note += 1
+                    if verbose:
+                        t.write(f"Skipping {filename} as it already exists.")
                     continue
 
-            for asset in daily_entry.assets:
-                asset.file = daylio.load_asset(asset.checksum)
+                if skip_empty:
+                    if not daily_entry.note_html and not daily_entry.note_title and not daily_entry.assets:
+                        skipped_empty += 1
+                        if verbose:
+                            t.write(f"Skipping {filename} as it has no note and no assets.")
+                        continue
 
-                asset_path = os.path.join(images, asset.file.filename)
-                if os.path.exists(asset_path) and not overwrite:
-                    click.echo(f"Skipping {asset.file.filename} as it already exists.")
-                    continue
+                for asset in daily_entry.assets:
+                    asset.file = daylio.load_asset(asset.checksum)
 
-                print(f"Writing to {asset_path}")
-                with open(asset_path, 'wb') as f:
-                    f.write(asset.file.data)
+                    asset_path = os.path.join(images, asset.file.filename)
+                    if os.path.exists(asset_path) and not overwrite:
+                        skipped_existing_asset += 1
+                        if verbose:
+                            t.write(f"Skipping {asset.file.filename} as it already exists.")
+                        continue
 
-            md = template.render(
-                entry=daily_entry
-            )
+                    written = write_file_if_unchanged(asset_path, asset.file.data)
+                    if written:
+                        if verbose:
+                            t.write(f"Exported {filename}")
+                        exported_asset += 1
+                    else:
+                        if verbose:
+                            t.write(f"Skipping {asset.file.filename} as it already exists with identical content.")
+                        skipped_existing_asset += 1
 
-            print(f"Writing to {path}")
-            with open(path, 'w') as file:
-                file.write(md)
+                md = template.render(
+                    entry=daily_entry
+                )
 
-    pass
+                written = write_file_if_unchanged(path, md.encode('utf-8'))
+                if written:
+                    if verbose:
+                        t.write(f"Exported {filename}")
+                    exported_note += 1
+                else:
+                    if verbose:
+                        t.write(f"Skipping {filename} as it already exists with identical content.")
+                    skipped_existing_note += 1
 
+                # unload the asset bytes from memory once the note is processed
+                for asset in daily_entry.assets:
+                    asset.file = None
+
+        if skip_empty:
+            print(f"Skipped {skipped_empty} empty (no note, and no assets) entries.")
+        print(f"Skipped {skipped_existing_note} existing notes and {skipped_existing_asset} existing assets.")
+        print(f"Exported {exported_note} notes and {exported_asset} assets.")
 
 if __name__ == '__main__':
     main()
